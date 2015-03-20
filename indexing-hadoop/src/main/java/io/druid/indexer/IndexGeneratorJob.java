@@ -32,6 +32,7 @@ import com.metamx.common.IAE;
 import com.metamx.common.ISE;
 import com.metamx.common.guava.CloseQuietly;
 import com.metamx.common.logger.Logger;
+import com.metamx.common.parsers.ParseException;
 import io.druid.collections.StupidPool;
 import io.druid.data.input.InputRow;
 import io.druid.data.input.impl.StringInputRowParser;
@@ -359,10 +360,21 @@ public class IndexGeneratorJob implements Jobby
 
         for (final Text value : values) {
           context.progress();
-          final InputRow inputRow = index.formatRow(parser.parse(value.toString()));
-          allDimensionNames.addAll(inputRow.getDimensions());
+          int numRows;
+          try {
+            final InputRow inputRow = index.formatRow(parser.parse(value.toString()));
+            allDimensionNames.addAll(inputRow.getDimensions());
 
-          int numRows = index.add(inputRow);
+            numRows = index.add(inputRow);
+          } catch (ParseException e) {
+            if (config.isIgnoreInvalidRows()) {
+              log.debug(e, "Ignoring invalid row [%s] due to parsing error", value.toString());
+              context.getCounter(HadoopDruidIndexerConfig.IndexJobCounters.INVALID_ROW_COUNTER).increment(1);
+              continue;
+            } else {
+              throw e;
+            }
+          }
           ++lineCount;
 
           if (!index.canAppendRow()) {
