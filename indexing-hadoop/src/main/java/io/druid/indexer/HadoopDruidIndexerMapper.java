@@ -18,6 +18,7 @@
 package io.druid.indexer;
 
 import com.metamx.common.RE;
+import com.metamx.common.logger.Logger;
 import io.druid.data.input.InputRow;
 import io.druid.data.input.impl.StringInputRowParser;
 import io.druid.segment.indexing.granularity.GranularitySpec;
@@ -30,6 +31,8 @@ import java.io.IOException;
 
 public abstract class HadoopDruidIndexerMapper<KEYOUT, VALUEOUT> extends Mapper<LongWritable, Text, KEYOUT, VALUEOUT>
 {
+  private static final Logger log = new Logger(HadoopDruidIndexerMapper.class);
+
   private HadoopDruidIndexerConfig config;
   private StringInputRowParser parser;
 
@@ -63,6 +66,7 @@ public abstract class HadoopDruidIndexerMapper<KEYOUT, VALUEOUT> extends Mapper<
       }
       catch (Exception e) {
         if (config.isIgnoreInvalidRows()) {
+          log.debug(e, "Ignoring invalid row [%s] due to parsing error", value.toString());
           context.getCounter(HadoopDruidIndexerConfig.IndexJobCounters.INVALID_ROW_COUNTER).increment(1);
           return; // we're ignoring this invalid row
         } else {
